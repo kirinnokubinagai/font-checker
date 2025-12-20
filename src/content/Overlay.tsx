@@ -67,47 +67,68 @@ export default function Overlay({ text, font, initialStyles, onClose }: OverlayP
 
   const scanSiteFonts = () => {
     setIsScanning(true);
-    // Use requestIdleCallback or setTimeout to not block UI
-    setTimeout(() => {
-        const fonts = new Set<string>();
-        try {
-            const elements = document.getElementsByTagName('*');
-            for (let i = 0; i < elements.length; i++) {
-                const font = window.getComputedStyle(elements[i]).fontFamily;
-                // Basic cleanup
+    const fonts = new Set<string>();
+    const elements = Array.from(document.getElementsByTagName('*'));
+    let index = 0;
+    const batchSize = 100; // Process 100 elements at a time
+
+    const processBatch = () => {
+        const end = Math.min(index + batchSize, elements.length);
+        for (; index < end; index++) {
+            try {
+                const font = window.getComputedStyle(elements[index]).fontFamily;
                 const families = font.split(',');
                 if (families.length > 0) {
-                   const clean = families[0].replace(/['"]/g, '').trim();
-                   if (clean && !clean.startsWith('__')) fonts.add(clean);
+                    const clean = families[0].replace(/['"]/g, '').trim();
+                    if (clean && !clean.startsWith('__')) fonts.add(clean);
                 }
+            } catch (e) {
+                // Ignore elements that might have been removed or are inaccessible
             }
-        } catch (e) {
-            console.error("Font scan error", e);
         }
-        setSiteFonts(Array.from(fonts).sort());
-        setIsScanning(false);
-    }, 50);
+
+        if (index < elements.length) {
+            if ('requestIdleCallback' in window) {
+                (window as any).requestIdleCallback(() => processBatch());
+            } else {
+                setTimeout(processBatch, 10);
+            }
+        } else {
+            setSiteFonts(Array.from(fonts).sort());
+            setIsScanning(false);
+        }
+    };
+
+    processBatch();
   };
 
   return (
-    <div className="fixed top-4 right-4 z-[999999] bg-white text-black font-sans border-4 border-black w-[350px] shadow-2xl animate-accordion-down max-h-[90vh] flex flex-col">
+    <div 
+        className="fixed top-4 right-4 z-[2147483647] bg-white text-black font-sans border-4 border-black w-[min(350px,calc(100vw-2rem))] shadow-2xl animate-accordion-down max-h-[90vh] flex flex-col"
+        role="dialog"
+        aria-label="Font Checker Overlay"
+    >
       <header className="flex justify-between items-center p-3 border-b-4 border-black bg-white shrink-0">
         <h2 className="font-black uppercase tracking-tighter text-xl">Font Checker</h2>
-        <button onClick={onClose} className="font-mono text-xl font-bold hover:bg-black hover:text-white px-2 rounded-sm transition-colors">
+        <button 
+            onClick={onClose} 
+            className="font-mono text-xl font-bold hover:bg-black hover:text-white px-2 rounded-sm transition-colors"
+            aria-label="Close overlay"
+        >
           ✕
         </button>
       </header>
 
       <div className="overflow-y-auto flex-1">
         <section className="p-4 border-b border-black">
-          <label className="block text-[10px] font-bold uppercase tracking-[0.2em] mb-2 opacity-60">Selection</label>
+          <label className="block text-xs font-bold uppercase tracking-[0.2em] mb-2 opacity-60">Selection</label>
           <div className="text-xl font-bold leading-tight break-words">
             "{text}"
           </div>
         </section>
 
         <section className="p-4 border-b border-black bg-black text-white">
-          <label className="block text-[10px] font-bold uppercase tracking-[0.2em] mb-1 opacity-80 decoration-white underline">Typeset In</label>
+          <label className="block text-xs font-bold uppercase tracking-[0.2em] mb-1 opacity-80 decoration-white underline">Typeset In</label>
           <div className="font-mono text-lg break-all mb-2">
             {font?.replace(/['"]/g, '') || "Unknown"}
           </div>
@@ -129,7 +150,7 @@ export default function Overlay({ text, font, initialStyles, onClose }: OverlayP
 
              {siteFonts.length > 0 && (
                 <div className="p-3 bg-gray-50">
-                    <label className="block text-[10px] font-bold uppercase tracking-[0.2em] mb-2 opacity-60">Detected on Page</label>
+                    <label className="block text-xs font-bold uppercase tracking-[0.2em] mb-2 opacity-60">Detected on Page</label>
                     <div className="flex flex-wrap gap-2">
                         {siteFonts.map(f => (
                             <span key={f} className="text-xs border border-black px-1.5 py-0.5 bg-white font-mono break-all">{f}</span>
@@ -141,12 +162,12 @@ export default function Overlay({ text, font, initialStyles, onClose }: OverlayP
 
         {/* Font Editor Section */}
          <section className="border-b border-black p-4 bg-gray-50 flex-1 overflow-hidden flex flex-col">
-            <label className="block text-[10px] font-bold uppercase tracking-[0.2em] mb-3 opacity-60">Font Editor</label>
+            <label className="block text-xs font-bold uppercase tracking-[0.2em] mb-3 opacity-60">Font Editor</label>
             
             <div className="space-y-4">
                 {/* Family Input & Picker */}
                 <div>
-                    <label className="block text-[9px] font-bold uppercase mb-1">Family</label>
+                    <label className="block text-[11px] font-bold uppercase mb-1">Family</label>
                     <div className="flex gap-2 relative">
                         <input 
                             type="text" 
@@ -185,7 +206,7 @@ export default function Overlay({ text, font, initialStyles, onClose }: OverlayP
                 {/* Size & Style Controls */}
                 <div className="flex gap-4 items-end">
                     <div className="flex-1">
-                        <label className="block text-[9px] font-bold uppercase mb-1">Size: {editFontSize}px</label>
+                        <label className="block text-[11px] font-bold uppercase mb-1">Size: {editFontSize}px</label>
                         <input 
                             type="range" 
                             min="8" 

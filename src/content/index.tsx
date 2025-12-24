@@ -205,11 +205,38 @@ window.addEventListener('font-checker-update-style', ((e: CustomEvent) => {
   }
   
   if (targetElement) {
-      targetElement.dataset.fontCheckerStyled = "true";
-      if (fontFamily) targetElement.style.fontFamily = fontFamily.includes(' ') ? `"${fontFamily}"` : fontFamily;
-      if (fontSize) targetElement.style.fontSize = fontSize;
-      if (fontWeight) targetElement.style.fontWeight = fontWeight;
-      if (fontStyle) targetElement.style.fontStyle = fontStyle;
+      if (!targetElement.dataset.fontCheckerStyled) {
+          targetElement.dataset.fontCheckerStyled = "true";
+      }
+
+      try {
+        if (fontFamily) targetElement.style.fontFamily = fontFamily.includes(' ') ? `"${fontFamily}"` : fontFamily;
+        if (fontSize) targetElement.style.fontSize = fontSize;
+        if (fontWeight) targetElement.style.fontWeight = fontWeight;
+        if (fontStyle) targetElement.style.fontStyle = fontStyle;
+
+        // CRITICAL FIX: The element size changed, so we MUST update the visual highlight
+        // AND ensuring the browser selection matches is vital for continued interaction.
+        const newRange = document.createRange();
+        newRange.selectNodeContents(targetElement);
+        
+        // Sync Browser Selection
+        const sel = window.getSelection();
+        if (sel) {
+            sel.removeAllRanges();
+            sel.addRange(newRange);
+        }
+        
+        // Sync Visual Highlight
+        updateHighlight(newRange);
+        
+        // Sync Internal State
+        lastTargetElement = targetElement;
+        lastRange = newRange.cloneRange();
+        
+      } catch (e) {
+          console.error("FontChecker: Error apply styles", e);
+      }
   }
 }) as EventListener);
 
@@ -340,11 +367,15 @@ document.addEventListener('mouseup', () => {
         let text = "";
         let rects: DOMRectList | null = null;
         let isBackwards = false;
+        let element: HTMLElement | null = null;
 
         if (selection && !selection.isCollapsed) {
             text = selection.toString();
             const range = selection.getRangeAt(0);
             rects = range.getClientRects();
+            const anchorNode = selection.anchorNode;
+            element = anchorNode?.nodeType === Node.TEXT_NODE ? anchorNode.parentElement : anchorNode as HTMLElement;
+
             const anchorOffset = selection.anchorOffset;
             const focusOffset = selection.focusOffset;
             if (selection.anchorNode === selection.focusNode) {
@@ -356,6 +387,7 @@ document.addEventListener('mouseup', () => {
         } else {
             const active = document.activeElement;
             if (active instanceof HTMLInputElement || active instanceof HTMLTextAreaElement) {
+                element = active;
                 const start = active.selectionStart;
                 const end = active.selectionEnd;
                 if (start !== null && end !== null && start !== end) {
@@ -380,7 +412,30 @@ document.addEventListener('mouseup', () => {
         }
         x += window.scrollX; y += window.scrollY;
         
-        if (overlayRoot && overlayContainer) return;
+        if (overlayRoot && overlayContainer) {
+            // CRITICAL FIX: Update the selection state even if overlay is already open
+            prepareSelectionTarget(text);
+            
+            // Detected font on demand if overlay is open
+            const fontFamily = element ? getRenderedFont(element) : 'Unknown';
+            const styles = element ? window.getComputedStyle(element) : { fontSize: '16px', fontWeight: '400', fontStyle: 'normal' };
+            
+            overlayRoot.render(
+             <React.StrictMode>
+               <Overlay 
+                 text={text} 
+                 font={fontFamily} 
+                 initialStyles={{
+                    fontSize: styles.fontSize,
+                    fontWeight: styles.fontWeight,
+                    fontStyle: styles.fontStyle
+                 }}
+                 onClose={removeOverlay} 
+               />
+             </React.StrictMode>
+            );
+            return;
+        }
         showTooltip(x, y, text);
     });
 });

@@ -93,7 +93,7 @@ test.describe('Font Checker Extension', () => {
     // BUT we must verify that the extension switched its internal "targetElement" to #target-2.
     // So "styledElement" locator might return multiple.
     
-    const styledElements = page.locator('[data-font-checker-styled="true"]');
+
     // We expect at least checking target-2 text or parent.
     const target2Styled = page.locator('#target-2[data-font-checker-styled="true"], #target-2 [data-font-checker-styled="true"], [data-font-checker-styled="true"] >> text=italic text');
     

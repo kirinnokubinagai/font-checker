@@ -58,6 +58,21 @@ function removeHighlight() {
 }
 
 /**
+ * Checks if an element or any of its parents has position: fixed or sticky.
+ */
+function getPositionStrategy(node: Node): 'fixed' | 'absolute' {
+    let current = node.nodeType === Node.TEXT_NODE ? node.parentElement : node as HTMLElement;
+    while (current && current !== document.body && current instanceof HTMLElement) {
+        const style = window.getComputedStyle(current);
+        if (style.position === 'fixed' || style.position === 'sticky') {
+            return 'fixed';
+        }
+        current = current.parentElement;
+    }
+    return 'absolute';
+}
+
+/**
  * Updates the visual selection highlight (non-destructive).
  * @param range The range to highlight.
  */
@@ -66,22 +81,27 @@ function updateHighlight(range: Range) {
     const rects = range.getClientRects();
     if (rects.length === 0) return;
 
+    const strategy = getPositionStrategy(range.commonAncestorContainer);
+
     highlightElement = document.createElement('div');
     highlightElement.id = 'font-checker-selection-highlight';
     Object.assign(highlightElement.style, {
-        position: 'absolute',
+        position: strategy,
         pointerEvents: 'none',
         zIndex: '2147483646',
         border: '2px dashed #000',
         backgroundColor: 'rgba(0, 0, 0, 0.05)',
         borderRadius: '2px',
-        transition: 'allCode 0.1s ease-out'
+        transition: 'all 0.1s ease-out'
     });
 
     const bounding = range.getBoundingClientRect();
+    const scrollTop = strategy === 'absolute' ? window.scrollY : 0;
+    const scrollLeft = strategy === 'absolute' ? window.scrollX : 0;
+
     Object.assign(highlightElement.style, {
-        top: `${bounding.top + window.scrollY}px`,
-        left: `${bounding.left + window.scrollX}px`,
+        top: `${bounding.top + scrollTop}px`,
+        left: `${bounding.left + scrollLeft}px`,
         width: `${bounding.width}px`,
         height: `${bounding.height}px`,
     });
@@ -178,6 +198,20 @@ window.addEventListener('font-checker-update-style', ((e: CustomEvent) => {
   
   if (activeRange) {
       targetElement = findExistingWrapper(activeRange.commonAncestorContainer);
+
+      // Check for partial selection: if we found a wrapper but the selected text is strictly smaller,
+      // we should NOT use the existing wrapper, but create a new nested one.
+      if (targetElement) {
+          const selectedText = activeRange.toString().trim();
+          const wrapperText = targetElement.textContent?.trim() || "";
+          
+          // Simple length heuristic or exact match check. 
+          // If selection is shorter than wrapper, it's a partial selection.
+          if (selectedText.length > 0 && selectedText.length < wrapperText.length) {
+              targetElement = null; // Force creation of new span
+          }
+      }
+
       if (!targetElement && !activeRange.collapsed) {
           try {
               const span = document.createElement('span');
@@ -317,12 +351,12 @@ function removeTooltip() {
 /**
  * Shows the tooltip near the selection.
  */
-function showTooltip(x: number, y: number, text: string) {
+function showTooltip(x: number, y: number, text: string, strategy: 'fixed' | 'absolute' = 'absolute') {
   removeTooltip();
   globalTooltipContainer = document.createElement('div');
   globalTooltipContainer.className = 'font-checker-tooltip';
   Object.assign(globalTooltipContainer.style, {
-    position: 'absolute', top: `${y}px`, left: `${x}px`, zIndex: '2147483647',
+    position: strategy, top: `${y}px`, left: `${x}px`, zIndex: '2147483647',
     cursor: 'pointer', width: '40px', height: '40px', display: 'flex',
     alignItems: 'center', justifyContent: 'center', background: 'transparent',
     transition: 'transform 0.1s ease-in-out', filter: 'drop-shadow(0 4px 6px rgba(0,0,0,0.3))'
@@ -361,7 +395,18 @@ function showTooltip(x: number, y: number, text: string) {
   document.body.appendChild(globalTooltipContainer);
 }
 
-document.addEventListener('mouseup', () => {
+const mouseUpHandler = () => {
+    // Safety check: specific for "Extension context invalidated"
+    try {
+        if (!chrome.runtime?.id) {
+            document.removeEventListener('mouseup', mouseUpHandler);
+            return;
+        }
+    } catch {
+        document.removeEventListener('mouseup', mouseUpHandler);
+        return;
+    }
+
     requestAnimationFrame(() => {
         const selection = window.getSelection();
         let text = "";
@@ -410,7 +455,10 @@ document.addEventListener('mouseup', () => {
             const lastRect = rects[rects.length - 1];
             x = lastRect.right; y = lastRect.bottom + 10;
         }
-        x += window.scrollX; y += window.scrollY;
+        const strategy = element ? getPositionStrategy(element) : 'absolute';
+        if (strategy === 'absolute') {
+            x += window.scrollX; y += window.scrollY;
+        }
         
         if (overlayRoot && overlayContainer) {
             // CRITICAL FIX: Update the selection state even if overlay is already open
@@ -436,9 +484,11 @@ document.addEventListener('mouseup', () => {
             );
             return;
         }
-        showTooltip(x, y, text);
+        showTooltip(x, y, text, strategy);
     });
-});
+};
+
+document.addEventListener('mouseup', mouseUpHandler);
 
 document.addEventListener('mousedown', (e) => {
    if (globalTooltipContainer && !globalTooltipContainer.contains(e.target as Node)) removeTooltip();

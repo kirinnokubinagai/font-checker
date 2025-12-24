@@ -58,7 +58,7 @@ export default function Overlay({ text, font, initialStyles, onClose }: OverlayP
      setEditFontSize(initialSize);
      setIsBold(initialBold);
      setIsItalic(initialItalic);
-  }, [text, font, initialStyles.fontSize, initialStyles.fontWeight, initialStyles.fontStyle]);
+  }, [font, initialSize, initialBold, initialItalic]);
 
   const handleFontSelect = (newFont: string) => {
     setEditFontFamily(newFont);
@@ -82,14 +82,14 @@ export default function Overlay({ text, font, initialStyles, onClose }: OverlayP
                     const clean = families[0].replace(/['"]/g, '').trim();
                     if (clean && !clean.startsWith('__')) fonts.add(clean);
                 }
-            } catch (e) {
+            } catch (_e) {
                 // Ignore elements that might have been removed or are inaccessible
             }
         }
 
         if (index < elements.length) {
             if ('requestIdleCallback' in window) {
-                (window as any).requestIdleCallback(() => processBatch());
+                (window as unknown as { requestIdleCallback: (cb: () => void) => void }).requestIdleCallback(() => processBatch());
             } else {
                 setTimeout(processBatch, 10);
             }

@@ -23,7 +23,7 @@ let lastRange: Range | null = null;
  */
 function findExistingWrapper(node: Node | null): HTMLElement | null {
     if (!node) return null;
-    let current: Node | null = node;
+    const current: Node | null = node;
     
     if (current.nodeType === Node.ELEMENT_NODE && (current as HTMLElement).dataset.fontCheckerStyled === "true") {
         return current as HTMLElement;
@@ -172,7 +172,7 @@ window.addEventListener('font-checker-update-style', ((e: CustomEvent) => {
   let targetElement: HTMLElement | null = null;
   
   const selection = window.getSelection();
-  let activeRange = (selection && selection.rangeCount > 0 && !selection.isCollapsed) 
+  const activeRange = (selection && selection.rangeCount > 0 && !selection.isCollapsed) 
     ? selection.getRangeAt(0) 
     : lastRange;
   
@@ -215,7 +215,7 @@ window.addEventListener('font-checker-update-style', ((e: CustomEvent) => {
 
 window.addEventListener('font-checker-reset-style', (() => {
     const selection = window.getSelection();
-    let activeRange = (selection && selection.rangeCount > 0) ? selection.getRangeAt(0) : lastRange;
+    const activeRange = (selection && selection.rangeCount > 0) ? selection.getRangeAt(0) : lastRange;
     if (!activeRange) return;
 
     const targetElement = findExistingWrapper(activeRange.commonAncestorContainer);

@@ -7,7 +7,7 @@ describe('getRenderedFont', () => {
     const spy = vi.spyOn(document, 'createElement');
     spy.mockReturnValue({
         getContext: () => null
-    } as any);
+    } as unknown as HTMLCanvasElement);
 
     const mockElement = {
         innerText: 'test',

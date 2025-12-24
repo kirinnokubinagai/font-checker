@@ -50,7 +50,7 @@ export default function Popup() {
                             handleNoText();
                           }
                         });
-                    } catch (err) {
+                    } catch (_err) {
                         handleNoText();
                     }
                  }, 50); // Reduced timeout for faster perceived response
@@ -61,7 +61,7 @@ export default function Popup() {
               handleNoText();
             }
           });
-        } catch (e) {
+        } catch (_e) {
           handleNoText();
         }
       } else {
